@@ -1,0 +1,437 @@
+from typing import *
+from dataclasses import dataclass, field
+
+WhereList = List[List]
+
+SPACE = ' '
+
+
+@dataclass(frozen=True, eq=True)
+class Variable(object):
+    name: str
+
+    def __str__(self):
+        return self.name
+
+    def code(self):
+        return "?" + self.name
+
+
+@dataclass(eq=True)
+class AggregateFunction(object):
+    name: str
+    args: Tuple[Variable] = field(default_factory=tuple)
+
+    def __call__(self, *args, **kwargs):
+        self.args = args
+        return self
+
+    def code(self):
+        return '(' + self.name + SPACE + self.args[0].code() + ')'
+
+
+Findable = Union[Variable, AggregateFunction]
+
+
+@dataclass(frozen=True, eq=True)
+class UnderScoreVariable(object):
+    name: str = "_"
+
+    def __str__(self):
+        return self.name
+
+    def code(self):
+        return str(self.name)
+
+
+@dataclass(frozen=True, eq=True)
+class DatabaseVariable(Variable):
+    # TODO: Same as Underscore variable. Use MetaClass?
+    name: str = "$"
+
+    def __str__(self):
+        return self.name
+
+    def code(self):
+        # TODO: Do we need to to str()
+        return str(self.name)
+
+
+@dataclass(frozen=True, eq=True)
+class RuleVariable(Variable):
+    # TODO: Same as Underscore variable. Use MetaClass?
+    name: str = "%"
+
+    def __str__(self):
+        return self.name
+
+    def code(self):
+        # TODO: Do we need to to str()
+        return str(self.name)
+
+
+@dataclass(frozen=True, eq=True)
+class AnyParameter(object):
+    variable: Variable
+
+    def __str__(self):
+        return self.variable
+
+    def code(self):
+        # TODO: Do we need to to str()
+        # [?name ...]
+        return '[' + self.variable.code() + ' ...]'
+
+
+@dataclass(frozen=True, eq=True)
+class CollectionParameter(object):
+    variables: List[Variable]
+
+    def __str__(self):
+        return self.variables
+
+    def code(self):
+        mapped_vars = map(lambda x: x.code(), self.variables)
+        return '[[' + SPACE.join(mapped_vars) + ']]'
+
+
+# @dataclass(frozen=True, eq=True)
+# class Query(object):
+#     find: List[Variable]
+#     where: List[List]
+#     parameters: List[Variable]
+#
+#     def code(self) -> str:
+#         vars = self.to_code(self.find)
+#
+#         spaced_vars = spacify(vars)
+#         find_str = ':find ' + spaced_vars
+#         if self.parameters:
+#             parameter_str = SPACE.join([":in"] + list(self.to_code(self.parameters))) + SPACE
+#         else:
+#             parameter_str = ''
+#         where_str_list = map(lambda a_l: translate_where(a_l), self.where)
+#         where_str = spacify(where_str_list)
+#         return f"[{find_str} {parameter_str}:where {where_str}]"
+#         pass
+#
+#     @staticmethod
+#     def to_code(var_list: List[Findable]):
+#         return findables_to_code(var_list)
+
+@dataclass(frozen=True, eq=True)
+class Query(object):
+    find: List[Variable]
+    where: WhereList
+    parameters: List[Variable]
+
+    def code(self) -> str:
+        vars = self.to_code(self.find)
+
+        spaced_vars = spacify(vars)
+        find_str = ':find ' + spaced_vars
+
+        where_str_list = map(lambda a_l: translate_where(a_l), self.where)
+        where_str = spacify(where_str_list)
+        parameter_str = self.make_parameter_str(self.parameters, self.where)
+
+        return f"[{find_str} {parameter_str}:where {where_str}]"
+        pass
+
+    def make_parameter_str(self, parameters: List[Variable], where: WhereList):
+
+        all_parameters = []
+
+        if parameters or relation_in_where(where):
+            all_parameters.append(DatabaseVariable())
+
+        if relation_in_where(where):
+            all_parameters.append(RuleVariable())
+
+        if parameters:
+            all_parameters.extend(parameters)
+
+        if all_parameters:
+            parameter_str = SPACE.join([":in"] + list(self.to_code(all_parameters))) + SPACE
+        else:
+            parameter_str = ''
+        return parameter_str
+
+    @staticmethod
+    def to_code(var_list: List[Findable]):
+        return findables_to_code(var_list)
+
+
+def relation_in_where(where: WhereList) -> bool:
+    is_rule = map(lambda x: isinstance(x, Relation), where)
+    return any(is_rule)
+
+
+def findables_to_code(var_list):
+    # TODO: Duplicate
+    result = []
+    for r in var_list:
+        if hasattr(r, 'code'):
+            result.append(r.code())
+        elif isinstance(r, str):
+            result.append(f'"{r}"')
+        else:
+            result.append(str(r))
+    return result
+
+
+def spacify(code):
+    return SPACE.join(code)
+
+
+def codify(atom) -> str:
+    if isinstance(atom, Variable) or isinstance(atom, UnderScoreVariable) or isinstance(atom, Relation):
+        return atom.code()
+    elif isinstance(atom, str):
+        return f'"{atom}"'
+    else:
+        return str(atom)
+
+
+@dataclass(eq=True)
+class RelationalFunction(object):
+    name: str
+    function: Callable = None
+    variables: List = field(default_factory=list)
+
+    def __call__(self, *variables):
+        # return self.function(*terms, **kwargs)
+        self.variables = list(variables)
+        return self
+
+    def __str__(self):
+        # TODO: is this duplicate, the lisp brackets
+        var_str = findables_to_code(self.variables)
+        r = '(' + self.name + SPACE + SPACE.join(var_str) + ')'
+        return r
+
+
+class Aggregate:
+    def __init__(self):
+        pass
+
+    def __getattr__(self, name):
+        return AggregateFunction(name)
+
+
+class DataScriptFunction:
+
+    def __init__(self, var_name: str, function_name: str):
+        self.var_name = var_name
+        self.function_name = function_name
+        self.terms = tuple()
+
+    def __call__(self, *args, **kwargs):
+        self.terms = args
+        return self
+        pass
+
+    def str(self):
+        return self.code()
+
+    def code(self):
+        # TOOD: Duplicate of Relation code()
+        mapped_vars = []
+        for t in self.terms:
+            if isinstance(t, Variable):
+                mapped_vars.append(t.code())
+            else:
+                mapped_vars.append(f'"{t}"')
+
+        return '(' + self.function_name + SPACE + self.var_name + SPACE + SPACE.join(mapped_vars) + ')'
+
+
+class Var:
+    def __init__(self, name):
+        self.name = name
+        pass
+
+    def __getattr__(self, name):
+        return DataScriptFunction(self.code(), name)
+
+    def code(self):
+        return "?" + self.name
+
+
+class InvertedRelationInstance(object):
+    def __init__(self, relation_instance):
+        self.relation_instance = relation_instance
+        pass
+
+    def get_clause(self):
+        return "not " + self.relation_instance.get_clause()
+
+    def relation(self):
+        return self.get_clause()
+
+    def variables(self):
+        return self.relation_instance.variables()
+
+
+class Facts(object):
+    def __init__(self, *fact_list):
+        self.fact_list = fact_list
+
+    def get_clause(self):
+        fact_list_str = [f.relation() for f in self.fact_list]
+        return ', '.join(fact_list_str)
+
+    pass
+
+
+class Fact(object):
+    def __init__(self, terms):
+        self.terms = terms
+
+
+class Rule(object):
+    def __init__(self, head_atom, body_atoms):
+        self.head_atom = head_atom
+        self.body_atoms = body_atoms
+        pass
+
+    def relation(self):
+        if self.body_atoms:
+            mid_fragment = ' :- ' + str(self.body_atoms)
+        else:
+            mid_fragment = ''
+
+        result = self.head_atom.relation() + mid_fragment
+        return result
+
+    def get_clause(self):
+        if self.body_atoms:
+            mid_fragment = ' :- ' + self.body_atoms.get_clause()
+        else:
+            mid_fragment = ''
+
+        return self.head_atom.relation() + mid_fragment
+
+
+class RelationInstance(object):
+    def __init__(self, name, *variables):
+        self.name = name
+        self._variables = variables
+
+    def __le__(self, body: Union[List, Any]):
+        if isinstance(body, List):
+            b = Facts(*body)
+        else:
+            b = body
+        return Rule(self, b)
+
+    def variables(self):
+        return self._variables
+
+    def get_clause(self):
+        return self.relation_x()
+
+    def relation_x(self):
+        var_strs = []
+        # TODO: Duplicate isinstance check
+        for v in self.variables():
+            if isinstance(v, str):
+                x = f'"{v}"'
+            else:
+                x = str(v)
+
+            var_strs.append(x)
+        a_str = ','.join(var_strs)
+        return self.name + '(' + a_str + ')'
+
+    def relation(self):
+        return self.relation_x()
+
+    def __invert__(self):
+        return InvertedRelationInstance(self)
+        pass
+
+
+class Relation(object):
+    def __init__(self, name: str):
+        self._name = name
+        self.terms = tuple()
+
+    def name(self):
+        return self._name
+
+    def __call__(self, *variables):
+        self.terms = variables
+        return self
+
+    def code(self):
+        mapped_vars = []
+        for t in self.terms:
+            if isinstance(t, Variable):
+                mapped_vars.append(t.code())
+            else:
+                mapped_vars.append(f'"{t}"')
+
+        return '(' + self.name() + SPACE + SPACE.join(mapped_vars) + ')'
+
+
+WhereClause = Union[List, Relation]
+
+
+# TODO: Curry all functions?
+class DataScriptV1(object):
+    _ = UnderScoreVariable()
+    DB = DatabaseVariable()
+    agg = Aggregate()
+    RULE = RuleVariable()
+
+    @staticmethod
+    def function(name: str, func: Callable = None) -> RelationalFunction:
+        return RelationalFunction(name=name, function=func)
+
+    @staticmethod
+    def relation(name):
+        return Relation(name)
+
+    @staticmethod
+    def rule(head: Relation, body: List):
+        return Rule(head, body)
+
+    @staticmethod
+    def any(v: Variable) -> AnyParameter:
+        return AnyParameter(v)
+        pass
+
+    @staticmethod
+    def collection(vars: List[Variable]) -> CollectionParameter:
+        return CollectionParameter(vars)
+        pass
+
+    @staticmethod
+    def variables(*vars):
+        # TODO: Duplicate with bashlog
+        result = [Variable(v) for v in vars]
+        if len(result) == 1:
+            return result[0]
+        else:
+            return result
+
+    # m.find(query=[N, A], where=[[E, "name", N], [E, "age", A]])
+
+    def query(self, find: List[Variable], where: List[List], parameters: List = None):
+        parameters = parameters or []
+        return Query(find=find, where=where, parameters=parameters)
+
+
+def translate_where(where_clause: WhereClause) -> str:
+    if isinstance(where_clause, Relation):
+        result = where_clause.code()
+    else:
+        result = map(codify, where_clause)
+        result = '[' + spacify(result) + ']'
+
+    return result
+
+
+if __name__ == '__main__':
+    a = Var('a')
