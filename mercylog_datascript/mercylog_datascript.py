@@ -6,9 +6,11 @@ WhereList = List[List]
 SPACE = ' '
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(eq=True)
 class Variable(object):
-    name: str
+
+    def __init__(self, name):
+        self.name = name
 
     def __str__(self):
         return self.name
@@ -19,23 +21,31 @@ class Variable(object):
 
 @dataclass(eq=True)
 class AggregateFunction(object):
-    name: str
-    args: Tuple[Variable] = field(default_factory=tuple)
+    # name: str
+    # args: Tuple[Variable] = field(default_factory=tuple)
+
+    def __init__(self, name: str, args: Tuple[Variable] = None):
+        self.name = name
+        self.args = args or tuple()
 
     def __call__(self, *args, **kwargs):
         self.args = args
         return self
 
     def code(self):
-        return '(' + self.name + SPACE + self.args[0].code() + ')'
+        _code = spacify([self.name, self.args[0].code()])
+        return listify(_code)
 
 
 Findable = Union[Variable, AggregateFunction]
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(eq=True)
 class UnderScoreVariable(object):
-    name: str = "_"
+    # name: str = "_"
+
+    def __init__(self):
+        self.name = "_"
 
     def __str__(self):
         return self.name
@@ -44,10 +54,14 @@ class UnderScoreVariable(object):
         return str(self.name)
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(eq=True)
 class DatabaseVariable(Variable):
     # TODO: Same as Underscore variable. Use MetaClass?
-    name: str = "$"
+    # name: str = "$"
+
+    def __init__(self):
+        self.name = "$"
+        super(DatabaseVariable, self).__init__(self.name)
 
     def __str__(self):
         return self.name
@@ -57,10 +71,14 @@ class DatabaseVariable(Variable):
         return str(self.name)
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(eq=True)
 class RuleVariable(Variable):
     # TODO: Same as Underscore variable. Use MetaClass?
-    name: str = "%"
+    # name: str = "%"
+
+    def __init__(self):
+        self.name = "%"
+        super(RuleVariable, self).__init__(self.name)
 
     def __str__(self):
         return self.name
@@ -70,9 +88,11 @@ class RuleVariable(Variable):
         return str(self.name)
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(eq=True)
 class AnyParameter(object):
-    variable: Variable
+
+    def __init__(self, variable: Variable):
+        self.variable = variable
 
     def __str__(self):
         return self.variable
@@ -83,47 +103,28 @@ class AnyParameter(object):
         return '[' + self.variable.code() + ' ...]'
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(eq=True)
 class CollectionParameter(object):
-    variables: List[Variable]
+
+    def __init__(self, variables: List[Variable]):
+        self.variables = variables
+        pass
 
     def __str__(self):
         return self.variables
 
     def code(self):
         mapped_vars = map(lambda x: x.code(), self.variables)
-        return '[[' + SPACE.join(mapped_vars) + ']]'
+        return '[[' + spacify(mapped_vars) + ']]'
 
 
-# @dataclass(frozen=True, eq=True)
-# class Query(object):
-#     find: List[Variable]
-#     where: List[List]
-#     parameters: List[Variable]
-#
-#     def code(self) -> str:
-#         vars = self.to_code(self.find)
-#
-#         spaced_vars = spacify(vars)
-#         find_str = ':find ' + spaced_vars
-#         if self.parameters:
-#             parameter_str = SPACE.join([":in"] + list(self.to_code(self.parameters))) + SPACE
-#         else:
-#             parameter_str = ''
-#         where_str_list = map(lambda a_l: translate_where(a_l), self.where)
-#         where_str = spacify(where_str_list)
-#         return f"[{find_str} {parameter_str}:where {where_str}]"
-#         pass
-#
-#     @staticmethod
-#     def to_code(var_list: List[Findable]):
-#         return findables_to_code(var_list)
-
-@dataclass(frozen=True, eq=True)
+@dataclass(eq=True)
 class Query(object):
-    find: List[Variable]
-    where: WhereList
-    parameters: List[Variable]
+
+    def __init__(self, find: List[Variable], where: WhereList, parameters: List[Variable]):
+        self.find = find
+        self.where = where
+        self.parameters = parameters
 
     def code(self) -> str:
         vars = self.to_code(self.find)
@@ -152,7 +153,7 @@ class Query(object):
             all_parameters.extend(parameters)
 
         if all_parameters:
-            parameter_str = SPACE.join([":in"] + list(self.to_code(all_parameters))) + SPACE
+            parameter_str = spacify([":in"] + list(self.to_code(all_parameters))) + SPACE
         else:
             parameter_str = ''
         return parameter_str
@@ -180,9 +181,17 @@ def findables_to_code(var_list):
     return result
 
 
-def spacify(code):
+def spacify(code: List):
     return SPACE.join(code)
 
+
+# def codify(atom) -> str:
+#     if isinstance(atom, Variable) or isinstance(atom, UnderScoreVariable) or isinstance(atom, Relation):
+#         return atom.code()
+#     elif isinstance(atom, str):
+#         return f'"{atom}"'
+#     else:
+#         return str(atom)
 
 def codify(atom) -> str:
     if isinstance(atom, Variable) or isinstance(atom, UnderScoreVariable) or isinstance(atom, Relation):
@@ -195,9 +204,10 @@ def codify(atom) -> str:
 
 @dataclass(eq=True)
 class RelationalFunction(object):
-    name: str
-    function: Callable = None
-    variables: List = field(default_factory=list)
+    def __init__(self, name: str, function: Callable = None, variables: List = None):
+        self.name = name
+        self.function = function
+        self.variables = list()
 
     def __call__(self, *variables):
         # return self.function(*terms, **kwargs)
@@ -207,7 +217,8 @@ class RelationalFunction(object):
     def __str__(self):
         # TODO: is this duplicate, the lisp brackets
         var_str = findables_to_code(self.variables)
-        r = '(' + self.name + SPACE + SPACE.join(var_str) + ')'
+        _code = spacify([self.name, spacify(var_str)])
+        r = listify(_code)
         return r
 
 
@@ -243,7 +254,8 @@ class DataScriptFunction:
             else:
                 mapped_vars.append(f'"{t}"')
 
-        return '(' + self.function_name + SPACE + self.var_name + SPACE + SPACE.join(mapped_vars) + ')'
+        _code = spacify([self.function_name, self.var_name, spacify(mapped_vars)])
+        return listify(_code)
 
 
 class Var:
@@ -342,7 +354,7 @@ class RelationInstance(object):
 
             var_strs.append(x)
         a_str = ','.join(var_strs)
-        return self.name + '(' + a_str + ')'
+        return self.name + listify(a_str)
 
     def relation(self):
         return self.relation_x()
@@ -372,7 +384,9 @@ class Relation(object):
             else:
                 mapped_vars.append(f'"{t}"')
 
-        return '(' + self.name() + SPACE + SPACE.join(mapped_vars) + ')'
+        _code = spacify([self.name(), spacify(mapped_vars)])
+
+        return listify(_code)
 
 
 WhereClause = Union[List, Relation]
@@ -416,8 +430,6 @@ class DataScriptV1(object):
         else:
             return result
 
-    # m.find(query=[N, A], where=[[E, "name", N], [E, "age", A]])
-
     def query(self, find: List[Variable], where: List[List], parameters: List = None):
         parameters = parameters or []
         return Query(find=find, where=where, parameters=parameters)
@@ -433,5 +445,5 @@ def translate_where(where_clause: WhereClause) -> str:
     return result
 
 
-if __name__ == '__main__':
-    a = Var('a')
+def listify(code: str):
+    return '(' + code + ')'
