@@ -1,12 +1,10 @@
-from typing import *
-from dataclasses import dataclass, field
+# from typing import *
 
-WhereList = List[List]
+# WhereList = List[List]
 
 SPACE = ' '
 
 
-@dataclass(eq=True)
 class Variable(object):
 
     def __init__(self, name):
@@ -19,12 +17,11 @@ class Variable(object):
         return "?" + self.name
 
 
-@dataclass(eq=True)
 class AggregateFunction(object):
     # name: str
     # args: Tuple[Variable] = field(default_factory=tuple)
 
-    def __init__(self, name: str, args: Tuple[Variable] = None):
+    def __init__(self, name, args=None):
         self.name = name
         self.args = args or tuple()
 
@@ -37,10 +34,9 @@ class AggregateFunction(object):
         return listify(_code)
 
 
-Findable = Union[Variable, AggregateFunction]
+# Findable = Union[Variable, AggregateFunction]
 
 
-@dataclass(eq=True)
 class UnderScoreVariable(object):
     # name: str = "_"
 
@@ -54,7 +50,6 @@ class UnderScoreVariable(object):
         return str(self.name)
 
 
-@dataclass(eq=True)
 class DatabaseVariable(Variable):
     # TODO: Same as Underscore variable. Use MetaClass?
     # name: str = "$"
@@ -71,7 +66,6 @@ class DatabaseVariable(Variable):
         return str(self.name)
 
 
-@dataclass(eq=True)
 class RuleVariable(Variable):
     # TODO: Same as Underscore variable. Use MetaClass?
     # name: str = "%"
@@ -88,10 +82,9 @@ class RuleVariable(Variable):
         return str(self.name)
 
 
-@dataclass(eq=True)
 class AnyParameter(object):
 
-    def __init__(self, variable: Variable):
+    def __init__(self, variable):
         self.variable = variable
 
     def __str__(self):
@@ -103,10 +96,9 @@ class AnyParameter(object):
         return '[' + self.variable.code() + ' ...]'
 
 
-@dataclass(eq=True)
 class CollectionParameter(object):
 
-    def __init__(self, variables: List[Variable]):
+    def __init__(self, variables):
         self.variables = variables
         pass
 
@@ -118,15 +110,14 @@ class CollectionParameter(object):
         return '[[' + spacify(mapped_vars) + ']]'
 
 
-@dataclass(eq=True)
 class Query(object):
 
-    def __init__(self, find: List[Variable], where: WhereList, parameters: List[Variable]):
+    def __init__(self, find, where, parameters):
         self.find = find
         self.where = where
         self.parameters = parameters
 
-    def code(self) -> str:
+    def code(self):
         vars = self.to_code(self.find)
 
         spaced_vars = spacify(vars)
@@ -139,7 +130,7 @@ class Query(object):
         return f"[{find_str} {parameter_str}:where {where_str}]"
         pass
 
-    def make_parameter_str(self, parameters: List[Variable], where: WhereList):
+    def make_parameter_str(self, parameters, where):
 
         all_parameters = []
 
@@ -159,11 +150,11 @@ class Query(object):
         return parameter_str
 
     @staticmethod
-    def to_code(var_list: List[Findable]):
+    def to_code(var_list):
         return findables_to_code(var_list)
 
 
-def relation_in_where(where: WhereList) -> bool:
+def relation_in_where(where):
     is_rule = map(lambda x: isinstance(x, Relation), where)
     return any(is_rule)
 
@@ -181,7 +172,7 @@ def findables_to_code(var_list):
     return result
 
 
-def spacify(code: List):
+def spacify(code):
     return SPACE.join(code)
 
 
@@ -193,7 +184,7 @@ def spacify(code: List):
 #     else:
 #         return str(atom)
 
-def codify(atom) -> str:
+def codify(atom):
     if isinstance(atom, Variable) or isinstance(atom, UnderScoreVariable) or isinstance(atom, Relation):
         return atom.code()
     elif isinstance(atom, str):
@@ -202,9 +193,8 @@ def codify(atom) -> str:
         return str(atom)
 
 
-@dataclass(eq=True)
 class RelationalFunction(object):
-    def __init__(self, name: str, function: Callable = None, variables: List = None):
+    def __init__(self, name, function=None, variables=None):
         self.name = name
         self.function = function
         self.variables = list()
@@ -232,7 +222,7 @@ class Aggregate:
 
 class DataScriptFunction:
 
-    def __init__(self, var_name: str, function_name: str):
+    def __init__(self, var_name, function_name):
         self.var_name = var_name
         self.function_name = function_name
         self.terms = tuple()
@@ -330,8 +320,8 @@ class RelationInstance(object):
         self.name = name
         self._variables = variables
 
-    def __le__(self, body: Union[List, Any]):
-        if isinstance(body, List):
+    def __le__(self, body):
+        if isinstance(body, list):
             b = Facts(*body)
         else:
             b = body
@@ -365,7 +355,7 @@ class RelationInstance(object):
 
 
 class Relation(object):
-    def __init__(self, name: str):
+    def __init__(self, name):
         self._name = name
         self.terms = tuple()
 
@@ -389,7 +379,7 @@ class Relation(object):
         return listify(_code)
 
 
-WhereClause = Union[List, Relation]
+# WhereClause = Union[List, Relation]
 
 
 # TODO: Curry all functions?
@@ -400,7 +390,7 @@ class DataScriptV1(object):
     RULE = RuleVariable()
 
     @staticmethod
-    def function(name: str, func: Callable = None) -> RelationalFunction:
+    def function(name, func=None):
         return RelationalFunction(name=name, function=func)
 
     @staticmethod
@@ -408,16 +398,16 @@ class DataScriptV1(object):
         return Relation(name)
 
     @staticmethod
-    def rule(head: Relation, body: List):
+    def rule(head, body):
         return Rule(head, body)
 
     @staticmethod
-    def any(v: Variable) -> AnyParameter:
+    def any(v):
         return AnyParameter(v)
         pass
 
     @staticmethod
-    def collection(vars: List[Variable]) -> CollectionParameter:
+    def collection(vars):
         return CollectionParameter(vars)
         pass
 
@@ -430,12 +420,12 @@ class DataScriptV1(object):
         else:
             return result
 
-    def query(self, find: List[Variable], where: List[List], parameters: List = None):
+    def query(self, find, where, parameters=None):
         parameters = parameters or []
         return Query(find=find, where=where, parameters=parameters)
 
 
-def translate_where(where_clause: WhereClause) -> str:
+def translate_where(where_clause):
     if isinstance(where_clause, Relation):
         result = where_clause.code()
     else:
@@ -445,5 +435,5 @@ def translate_where(where_clause: WhereClause) -> str:
     return result
 
 
-def listify(code: str):
+def listify(code):
     return '(' + code + ')'

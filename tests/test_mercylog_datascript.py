@@ -1,10 +1,10 @@
 import unittest
-import mercylog_datascript
+from mercylog_datascript import core
 
 
 class MercyLogTestCase(unittest.TestCase):
     def setUp(self) -> None:
-        self.m = mercylog_datascript.DataScriptV1()
+        self.m = core.DataScriptV1()
 
     def test_find_data_pattern(self):
         N, A, E = self.m.variables('n', 'a', 'e')
