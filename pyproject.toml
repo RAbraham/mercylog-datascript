@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mercylog-datascript"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Rajiv Abraham <rajiv.abraham@gmail.com>"]
 

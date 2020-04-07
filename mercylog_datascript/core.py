@@ -207,9 +207,12 @@ class RelationalFunction(object):
     def __str__(self):
         # TODO: is this duplicate, the lisp brackets
         var_str = findables_to_code(self.variables)
-        _code = spacify([self.name, spacify(var_str)])
+        _code = spacify([self.code(), spacify(var_str)])
         r = listify(_code)
         return r
+
+    def code(self):
+        return "?" + self.name
 
 
 class Aggregate:
@@ -425,8 +428,19 @@ class DataScriptV1(object):
         return Query(find=find, where=where, parameters=parameters)
 
 
+# def translate_where(where_clause):
+#     if isinstance(where_clause, Relation):
+#         result = where_clause.code()
+#     else:
+#         result = map(codify, where_clause)
+#         result = '[' + spacify(result) + ']'
+#
+#     return result
+
 def translate_where(where_clause):
     if isinstance(where_clause, Relation):
+        result = where_clause.code()
+    elif isinstance(where_clause, RelationalFunction):
         result = where_clause.code()
     else:
         result = map(codify, where_clause)

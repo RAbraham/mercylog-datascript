@@ -75,9 +75,10 @@ class MercyLogTestCase(unittest.TestCase):
         e, a = self.m.variables('e', 'a')
         is_adult = self.m.function('is_adult', lambda x: x > 18)
         query = self.m.query(find=[e],
+                             parameters=[is_adult],
                              where=[[e, "age", a],
                                     [is_adult(a)]])
-        exp = '[:find ?e :where [?e "age" ?a] [(is_adult ?a)]]'
+        exp = '[:find ?e :in $ ?is_adult :where [?e "age" ?a] [(?is_adult ?a)]]'
         self.assertEqual(query.code(), exp)
         pass
 

@@ -1,5 +1,6 @@
 * Generate Brython Library
 ```python
+# Go into mercylog_datascript dir, don't stay in the root folder!
 cd ./mercylog_datascript
 python -m brython --make_package mercylog_datascript
 ```
