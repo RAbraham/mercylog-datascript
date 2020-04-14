@@ -145,12 +145,12 @@ class MercyLogTestCase(unittest.TestCase):
 
     def test_inbuilt_functions(self):
         title, m, year = self.m.variables('title', 'm', 'year')
-        gt = self.m.function("<")
+        lt = self.m.function("<")
         exp = '[:find ?title :where [?m ":movie/title" ?title] [?m ":movie/year" ?year] [(< ?year 1984)]]'
         query = self.m.query(find=[title],
                              where=[[m, ":movie/title", title],
                                     [m, ":movie/year", year],
-                                    [gt(year, 1984)]])
+                                    [lt(year, 1984)]])
         self.assertEqual(query.code(), exp)
 
     pass
