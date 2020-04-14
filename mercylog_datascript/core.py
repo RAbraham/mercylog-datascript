@@ -212,7 +212,10 @@ class RelationalFunction(object):
         return r
 
     def code(self):
-        return "?" + self.name
+        if self.function:
+            return "?" + self.name
+        else:
+            return self.name
 
 
 class Aggregate:

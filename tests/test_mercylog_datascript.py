@@ -107,7 +107,7 @@ class MercyLogTestCase(unittest.TestCase):
     #     pass
 
     def test_transformation(self):
-        exp = '[:find ?age :in $ ?name ?today :where [?p ":person/name" ?name] [?p ":person/born" ?born] [(get_age ?born ?today) ?age]]'
+        exp = '[:find ?age :in $ ?name ?today :where [?p ":person/name" ?name] [?p ":person/born" ?born] [(?get_age ?born ?today) ?age]]'
         get_age = self.m.function("get_age", lambda a_born, a_today: a_today - a_born)
         born, p, age, today, name = self.m.variables('born', 'p', 'age', 'today', 'name')
         query = self.m.query(find=[age],
