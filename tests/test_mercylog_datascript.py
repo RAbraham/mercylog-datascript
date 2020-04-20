@@ -166,6 +166,14 @@ class MercyLogTestCase(unittest.TestCase):
         exp = '[:find ?name :in $ % :where (actor-movie ?name "The Terminator")]'
         query = self.m.query(find=[name],
                              where=[actor_movie(name, "The Terminator")])
+        exp_relation_body = """
+[(actor-movie ?name ?title)
+ [?p ":person/name" ?name]
+ [?m ":movie/cast" ?p]
+ [?m ":movie/title" ?title]]
+"""
+        formatted_actual = '\n' + r.code() + '\n'
+        self.assertEqual(formatted_actual, exp_relation_body)
         self.assertEqual(query.code(), exp)
         pass
 

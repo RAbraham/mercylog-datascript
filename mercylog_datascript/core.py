@@ -123,7 +123,7 @@ class Query(object):
         spaced_vars = spacify(vars)
         find_str = ':find ' + spaced_vars
 
-        where_str_list = map(lambda a_l: translate_where(a_l), self.where)
+        where_str_list = map_where_clauses(self.where)
         where_str = spacify(where_str_list)
         parameter_str = self.make_parameter_str(self.parameters, self.where)
 
@@ -320,6 +320,22 @@ class Rule(object):
 
         return self.head_atom.relation() + mid_fragment
 
+    def code(self) -> str:
+        '''
+        [(actor-movie ?name ?title)
+ [?p :person/name ?name]
+ [?m :movie/cast ?p]
+ [?m :movie/title ?title]]
+        :return:
+        '''
+        head_str = str(self.head_atom.code())
+        # TODO: copied start
+        body_str_list = map_where_clauses(self.body_atoms)
+        # TODO: copied end
+        code_str = [head_str] + list(body_str_list)
+        return "[" + '\n '.join(code_str) + ']'
+        pass
+
 
 class RelationInstance(object):
     def __init__(self, name, *variables):
@@ -361,16 +377,20 @@ class RelationInstance(object):
 
 
 class Relation(object):
-    def __init__(self, name):
+    def __init__(self, name, terms=None):
         self._name = name
-        self.terms = tuple()
+        if terms:
+            self.terms = terms
+        else:
+            self.terms = tuple()
 
     def name(self):
         return self._name
 
     def __call__(self, *variables):
         self.terms = variables
-        return self
+
+        return Relation(self._name, self.terms)
 
     def code(self):
         mapped_vars = []
@@ -454,3 +474,7 @@ def translate_where(where_clause):
 
 def listify(code):
     return '(' + code + ')'
+
+
+def map_where_clauses(where_clauses):
+    return map(lambda a_l: translate_where(a_l), where_clauses)
