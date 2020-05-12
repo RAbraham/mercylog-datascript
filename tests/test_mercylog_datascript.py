@@ -167,11 +167,13 @@ class MercyLogTestCase(unittest.TestCase):
         query = self.m.query(find=[name],
                              where=[actor_movie(name, "The Terminator")])
         exp_relation_body = """
-[(actor-movie ?name ?title)
- [?p ":person/name" ?name]
- [?m ":movie/cast" ?p]
+[(actor-movie ?name ?title) \
+ [?p ":person/name" ?name] \
+ [?m ":movie/cast" ?p] \
  [?m ":movie/title" ?title]]
 """
+
+        print(repr(exp_relation_body))
         formatted_actual = '\n' + r.code() + '\n'
         self.assertEqual(formatted_actual, exp_relation_body)
         self.assertEqual(query.code(), exp)

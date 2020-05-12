@@ -333,7 +333,7 @@ class Rule(object):
         body_str_list = map_where_clauses(self.body_atoms)
         # TODO: copied end
         code_str = [head_str] + list(body_str_list)
-        return "[" + '\n '.join(code_str) + ']'
+        return "[" + ' \\\n '.join(code_str) + ']'
         pass
 
 
